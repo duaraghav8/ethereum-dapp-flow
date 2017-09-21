@@ -22,7 +22,7 @@ const myAccount = Web3.personal.listAccounts[0];
 console.log(`Account created successfully. Current balance information: ${Web3.eth.getBalance(myAccount)}`);
 console.log('Transferring some ether to my account from Web3.eth.coinbase...');
 
-Web3.eth.sendTransaction({from: Web3.eth.coinbase, to: myAccount, value 30000000000000});
+Web3.eth.sendTransaction({from: Web3.eth.coinbase, to: myAccount, value: 30000000000000});
 
 console.log(`Done! Update balance information: ${Web3.eth.getBalance(myAccount)}`);
 
@@ -36,6 +36,24 @@ const w3ContractObject = Web3.eth.contract (abi),
 
 console.log(`Contract successfully deployed at address ${contractInstance.address}`);
 
-contractInstance.getBuffer({from: myAccount});
+console.log(contractInstance.getBuffer.call({from: myAccount}));	// read-only, costs no ether
 contractInstance.setBuffer(69, {from: myAccount});
-contractInstance.getBuffer({from: myAccount});
+console.log(contractInstance.getBuffer.call({from: myAccount}));
+
+// Creating second instance of existing contract
+// This instance points to the same original contract created because its address is provided here.
+// This is how multiple systems can access the deployed contract
+const secondContractInstance = w3ContractObject.at(contractInstance.address);
+
+secondContractInstance.setBuffer(9999999, {from: myAccount});
+console.log(secondContractInstance.getBuffer.call({from: myAccount}));
+console.log(contractInstance.getBuffer.call({from: myAccount}));
+
+
+/**
+ * TODO:
+ * Transfer ether (contract -> contract, contract -> user account & vice versa)
+ * Make, deploy & use Library
+ * Write the upgrade contract (keeps track of all versions of the contract, directs user to the right one)
+ * Use other services (ipfs, swarm, whisper)
+ */
