@@ -34,6 +34,8 @@ if(!Web3.personal.unlockAccount(myAccount, ACCOUNT_PASSWORD, 15000)) {
 	process.exit(1);
 }
 
+
+
 /******* Creating & Deploying Contracts ********/
 const w3ContractObject = Web3.eth.contract(abi),
 	contractInstance = w3ContractObject.new('Raghav Dua', {from: myAccount, data: byteCode, gas: 1000000});
@@ -63,7 +65,7 @@ console.log(contractInstance.getBuffer.call({from: myAccount}));
  */
 
 // Import resolution
-const sources = {
+let sources = {
 	'MyLib.sol': 'library MyLib { function foo() {} }',
 	'Main.sol': 'import "./MyLib.sol";\ncontract MainC { function abc() { MyLib.foo(); } }'
 };
@@ -85,10 +87,63 @@ contractBC = solc.linkBytecode(contractBC, {'MyLib.sol:MyLib': libraryInstance.a
 contractInstance = w3ContractObject.new({from: myAccount, data: contractBC, gas: 1000000});
 
 
+
+/******* Contract calling other contract & watching events ********/
+/**
+ * There are 2 ways (same as web3):
+ * 1. Create and deploy a new instance of a contract from inside your main contract
+ * 2. Create instance of an already deployed contract (using its address) inside your main contract.
+ *
+ * You can either import a contract file in your main contract or create an abstract contract with function signatures
+ * same as those of the dependancy contract.
+ */
+
+// 2.
+let code = 'contract Base {\n\tfunction foo(uint value) returns (uint) {\n\t\treturn (value * 10);\n\t}\n}\n';
+compiled = solc.compile(code);
+abi = JSON.parse(compiled.contracts[':Base'].interface);
+bytecode = compiled.contracts[':Base'].bytecode;
+let baseInstance = Web3.eth.contract(abi).new({from: myAccount, data: bytecode, gas: 1000000});
+
+code = '\ncontract Base {\n\tfunction foo(uint value) returns (uint);\n}\n\ncontract Child {\n\tevent Trigger(uint value);\n\n\tfunction bar(address contractAddr, uint value) {\n\t\tBase myBase = Base(contractAddr);\n\t\tTrigger(myBase.foo(value));\n\t}\n}\n';
+compiled = solc.compile(code);
+abi = JSON.parse(compiled.contracts[':Child'].interface);
+bytecode = compiled.contracts[':Child'].bytecode;
+let childInstance = Web3.eth.contract(abi).new({from: myAccount, data: bytecode, gas: 1000000});
+
+childInstance.Trigger().watch(console.log);
+childInstance.bar(baseInstance.address, 167, {from: myAccount});
+
+
+// 1.
+code = 'contract Base {\n\tfunction foo(uint value) returns (uint) {\n\t\treturn (value * 10);\n\t}\n}\n\ncontract Child {\n\tevent Trigger(uint value);\n\n\tfunction bar(uint value) {\n\t\tBase myBase = new Base();\n\t\tTrigger(myBase.foo(value));\n\t}\n}\n';
+compiled = solc.compile(code);
+abi = JSON.parse(compiled.contracts[':Child'].interface);
+bytecode = compiled.contracts[':Child'].bytecode;
+childInstance = Web3.eth.contract(abi).new({from: myAccount, data: bytecode, gas: 1000000});
+
+childInstance.Trigger().watch(console.log);
+childInstance.bar(98, {from: myAccount, gas: 1000000}); // Supply gas from here so Child could create new Base contract
+
+
+
+
 /**
  * TODO:
- * Make, deploy & use Library - DONE
- * Transfer ether (contract -> contract, contract -> user account & vice versa)
- * Write the upgrade contract (keeps track of all versions of the contract, directs user to the right one)
- * Use other services (ipfs, swarm, whisper)
+ * Make, deploy & use Library - [DONE]
+ * Contract using another contract's functionality (dependancy) - [DONE]
+ * Use other services (ipfs, swarm, whisper, bigchainDB)
+ * Transfer ether (contract -> contract, contract -> user account & vice versa) (use send() for an address object)
+ *		address(0x90...).send(100);	// sends 100 wei
+ * Best ways to upgrade libraries & contracts (pushing updates - how will continuous depoyment happen)
+ * everything about DELEGATECALL
+ * ethereum frontier vs homestead vs others - difference in development
+ * How to connect a contract to outside world (internet) in general (any port, url, protocol)
+ * How do oracles work?
+ * Testing
+ * Auditing, monitoring & profiling in smart contracts
+ * How to watch contracts for state change?
+ * What's the use of the return value of a function that's called as a transaction?
+ * First making transaction then watching for return value - this is too complex - should be simplified
+ * How can Dapp front end code reside on swarm / ipfs and get served to user (ie flow starting from ENS)
  */
